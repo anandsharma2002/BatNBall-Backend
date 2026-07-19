@@ -48,6 +48,24 @@ app.get('/ping', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'BatNBall API is active' });
 });
 
+app.get('/api/v1/health', (req, res) => {
+  const mongoose = require('mongoose');
+  res.status(200).json({
+    status: 'OK',
+    message: 'BatNBall API is active',
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: !!process.env.VERCEL,
+      MONGO_URI_DEFINED: !!process.env.MONGO_URI,
+      JWT_SECRET_DEFINED: !!process.env.JWT_SECRET,
+    },
+    database: {
+      readyState: mongoose.connection.readyState,
+      connectionHost: mongoose.connection.host || null
+    }
+  });
+});
+
 app.use('/api/v1/auth', require('./routes/authRoutes'));
 app.use('/api/v1/admin', require('./routes/adminRoutes'));
 app.use('/api/v1/users', require('./routes/userRoutes'));
