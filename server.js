@@ -40,6 +40,10 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 // Routes
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Welcome to the BatNBall API. Use /ping or /api/v1/... endpoints.' });
+});
+
 app.get('/ping', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'BatNBall API is active' });
 });
