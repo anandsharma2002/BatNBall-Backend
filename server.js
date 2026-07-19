@@ -1,4 +1,9 @@
 require('dotenv').config();
+console.log('DEBUG: Node Env:', process.env.NODE_ENV);
+console.log('DEBUG: Is Vercel:', !!process.env.VERCEL);
+console.log('DEBUG: MONGO_URI:', process.env.MONGO_URI ? 'Defined (starts with: ' + process.env.MONGO_URI.substring(0, 15) + '...)' : 'UNDEFINED');
+console.log('DEBUG: JWT_SECRET:', process.env.JWT_SECRET ? 'Defined' : 'UNDEFINED');
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
