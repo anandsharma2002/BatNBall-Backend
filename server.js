@@ -7,7 +7,8 @@ const connectDB = require('./config/db');
 
 const app = express();
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadBaseDir = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadBaseDir));
 
 // Connect to Database
 connectDB();
@@ -48,7 +49,11 @@ app.use('/api/v1/matches/:matchId/score', require('./routes/scoringRoutes'));
 app.use('/api/v1/leaderboard', require('./routes/leaderboardRoutes'));
 
 // Start Server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;

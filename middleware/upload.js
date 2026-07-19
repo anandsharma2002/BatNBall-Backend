@@ -3,8 +3,9 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure upload folders exist
-const avatarsDir = path.join(__dirname, '../uploads/avatars');
-const logosDir = path.join(__dirname, '../uploads/logos');
+const uploadBaseDir = process.env.VERCEL ? '/tmp/uploads' : path.join(__dirname, '../uploads');
+const avatarsDir = path.join(uploadBaseDir, 'avatars');
+const logosDir = path.join(uploadBaseDir, 'logos');
 
 if (!fs.existsSync(avatarsDir)) {
   fs.mkdirSync(avatarsDir, { recursive: true });
