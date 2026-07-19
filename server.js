@@ -61,7 +61,8 @@ app.get('/api/v1/health', (req, res) => {
     },
     database: {
       readyState: mongoose.connection.readyState,
-      connectionHost: mongoose.connection.host || null
+      connectionHost: mongoose.connection.host || null,
+      error: global.dbConnectionError || null
     }
   });
 });

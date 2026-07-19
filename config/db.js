@@ -43,12 +43,14 @@ const connectDB = async () => {
     if (!process.env.MONGO_URI) {
       throw new Error("MONGO_URI environment variable is missing!");
     }
+    global.dbConnectionError = null;
     const conn = await mongoose.connect(process.env.MONGO_URI);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     
     // Run username migration
     await migrateUsernames();
   } catch (error) {
+    global.dbConnectionError = error.message;
     console.error(`Error connecting to MongoDB: ${error.message}`);
     if (!process.env.VERCEL) {
       process.exit(1);
