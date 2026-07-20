@@ -329,6 +329,179 @@ const getAllMatches = async (req, res) => {
   }
 };
 
+const dropPlayerFromRoster = async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const { playerId } = req.body;
+
+    if (!playerId) {
+      return res.status(400).json({ error: 'Player ID is required' });
+    }
+
+    const match = await Match.findById(matchId);
+    if (!match) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+
+    // Pull playerId from all squad lists & umpires
+    match.playing_xi_team_first = match.playing_xi_team_first.filter(id => id.toString() !== playerId.toString());
+    match.playing_xi_team_second = match.playing_xi_team_second.filter(id => id.toString() !== playerId.toString());
+    match.substitutes_team_first = match.substitutes_team_first.filter(id => id.toString() !== playerId.toString());
+    match.substitutes_team_second = match.substitutes_team_second.filter(id => id.toString() !== playerId.toString());
+    match.umpires = match.umpires.filter(id => id.toString() !== playerId.toString());
+
+    await match.save();
+
+    const populatedMatch = await Match.findById(matchId)
+      .populate('team_first_id')
+      .populate('team_second_id')
+      .populate('playing_xi_team_first')
+      .populate('playing_xi_team_second')
+      .populate('substitutes_team_first')
+      .populate('substitutes_team_second')
+      .populate('umpires');
+
+    const player = await Player.findById(playerId);
+
+    const io = req.app.get('io');
+    if (io) {
+      const payload = {
+        matchId,
+        match: populatedMatch,
+        playerId: playerId.toString(),
+        playerName: player ? player.display_name : 'Player',
+        message: `${player ? player.display_name : 'Player'} removed from match roster`
+      };
+      io.to(matchId).emit('player_dropped', payload);
+      io.emit('global_player_dropped', payload);
+    }
+
+
+    return res.status(200).json({
+      message: 'Player dropped successfully',
+      match: populatedMatch
+    });
+  } catch (error) {
+    console.error('Drop player error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const movePlayerTeam = async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const { playerId, targetTeamId, isSubstitute } = req.body;
+
+    if (!playerId || !targetTeamId) {
+      return res.status(400).json({ error: 'Player ID and target Team ID are required' });
+    }
+
+    const match = await Match.findById(matchId);
+    if (!match) {
+      return res.status(404).json({ error: 'Match not found' });
+    }
+
+    const isTeamFirst = match.team_first_id.toString() === targetTeamId.toString();
+    const isTeamSecond = match.team_second_id.toString() === targetTeamId.toString();
+
+    if (!isTeamFirst && !isTeamSecond) {
+      return res.status(400).json({ error: 'Target team is not part of this match' });
+    }
+
+    // Remove player from all current squad lists
+    match.playing_xi_team_first = match.playing_xi_team_first.filter(id => id.toString() !== playerId.toString());
+    match.playing_xi_team_second = match.playing_xi_team_second.filter(id => id.toString() !== playerId.toString());
+    match.substitutes_team_first = match.substitutes_team_first.filter(id => id.toString() !== playerId.toString());
+    match.substitutes_team_second = match.substitutes_team_second.filter(id => id.toString() !== playerId.toString());
+
+    // Add to target team squad
+    if (isTeamFirst) {
+      if (isSubstitute) {
+        match.substitutes_team_first.push(playerId);
+      } else {
+        match.playing_xi_team_first.push(playerId);
+      }
+    } else {
+      if (isSubstitute) {
+        match.substitutes_team_second.push(playerId);
+      } else {
+        match.playing_xi_team_second.push(playerId);
+      }
+    }
+
+    await match.save();
+
+    const populatedMatch = await Match.findById(matchId)
+      .populate('team_first_id')
+      .populate('team_second_id')
+      .populate('playing_xi_team_first')
+      .populate('playing_xi_team_second')
+      .populate('substitutes_team_first')
+      .populate('substitutes_team_second')
+      .populate('umpires');
+
+    const player = await Player.findById(playerId);
+    const targetTeam = isTeamFirst ? populatedMatch.team_first_id : populatedMatch.team_second_id;
+
+    const io = req.app.get('io');
+    if (io) {
+      const payload = {
+        matchId,
+        match: populatedMatch,
+        playerId: playerId.toString(),
+        targetTeamName: targetTeam ? targetTeam.team_name : 'New Team',
+        playerName: player ? player.display_name : 'Player',
+        message: `${player ? player.display_name : 'Player'} moved to ${targetTeam ? targetTeam.team_name : 'new team'}`
+      };
+      io.to(matchId).emit('player_moved', payload);
+      io.emit('global_player_moved', payload);
+    }
+
+
+    return res.status(200).json({
+      message: 'Player moved successfully',
+      targetTeamName: targetTeam ? targetTeam.team_name : '',
+      playerName: player ? player.display_name : '',
+      match: populatedMatch
+    });
+  } catch (error) {
+    console.error('Move player error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const deleteMatch = async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const match = await Match.findById(matchId);
+
+    const BallByBall = require('../models/BallByBall');
+    const Partnership = require('../models/Partnership');
+
+    await BallByBall.deleteMany({ match_id: matchId });
+    await Partnership.deleteMany({ match_id: matchId });
+    if (match) {
+      await Match.findByIdAndDelete(matchId);
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      const payload = {
+        matchId: matchId.toString(),
+        message: 'This match has been removed or cancelled.'
+      };
+      io.to(matchId).emit('match_discarded', payload);
+      io.emit('global_match_discarded', payload);
+    }
+
+    return res.status(200).json({ message: 'Match discarded successfully' });
+  } catch (error) {
+    console.error('Delete match error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+
 module.exports = {
   createMatch,
   getMatchById,
@@ -336,5 +509,10 @@ module.exports = {
   joinMatchRoster,
   updateToss,
   updateUmpires,
-  getAllMatches
+  getAllMatches,
+  dropPlayerFromRoster,
+  movePlayerTeam,
+  deleteMatch
 };
+
+

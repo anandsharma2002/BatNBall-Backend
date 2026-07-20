@@ -76,8 +76,10 @@ const MatchSchema = new mongoose.Schema({
     overthrow_runs_allowed: { type: Boolean, default: true },
     bye_runs_allowed: { type: Boolean, default: true },
     leg_bye_runs_allowed: { type: Boolean, default: true },
-    penalty_runs_allowed: { type: Boolean, default: true }
+    penalty_runs_allowed: { type: Boolean, default: true },
+    allow_substitutes: { type: Boolean, default: true }
   },
+
   toss_won_by_team_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Team',
