@@ -81,6 +81,12 @@ if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+
+    // Pre-warm leaderboard cache after DB is ready so first user request is instant
+    const { warmLeaderboardCache } = require('./controllers/leaderboardController');
+    setTimeout(() => {
+      warmLeaderboardCache().catch(err => console.warn('Cache warm-up failed:', err.message));
+    }, 3000); // Wait 3s for DB connection to stabilize
   });
 }
 

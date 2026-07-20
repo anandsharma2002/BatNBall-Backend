@@ -212,16 +212,15 @@ const getPlayerCharts = async (req, res) => {
     let ballsVsSpinners = 0;
 
     allStrikerBalls.forEach(b => {
-      const bStyle = b.bowler_id?.bowling_style || 'NONE';
-      const isPacer = bStyle.includes('FAST') || bStyle.includes('MED');
-      const isSpinner = bStyle.includes('SPIN') || bStyle.includes('BREAK') || bStyle.includes('UNORTHODOX');
+      const bStyle = (b.bowler_id?.bowling_style || 'NONE').toUpperCase();
+      const isSpinner = bStyle.includes('SPIN') || bStyle.includes('BREAK') || bStyle.includes('UNORTHODOX') || bStyle.includes('SLOW');
 
-      if (isPacer) {
-        runsVsPacers += b.runs_from_bat;
-        if (b.extra_type !== 'WIDE') ballsVsPacers += 1;
-      } else if (isSpinner) {
-        runsVsSpinners += b.runs_from_bat;
+      if (isSpinner) {
+        runsVsSpinners += b.runs_from_bat || 0;
         if (b.extra_type !== 'WIDE') ballsVsSpinners += 1;
+      } else {
+        runsVsPacers += b.runs_from_bat || 0;
+        if (b.extra_type !== 'WIDE') ballsVsPacers += 1;
       }
     });
 
@@ -234,12 +233,11 @@ const getPlayerCharts = async (req, res) => {
     let outsVsSpinners = 0;
 
     allWickets.forEach(w => {
-      const bStyle = w.bowler_id?.bowling_style || 'NONE';
-      const isPacer = bStyle.includes('FAST') || bStyle.includes('MED');
-      const isSpinner = bStyle.includes('SPIN') || bStyle.includes('BREAK') || bStyle.includes('UNORTHODOX');
+      const bStyle = (w.bowler_id?.bowling_style || 'NONE').toUpperCase();
+      const isSpinner = bStyle.includes('SPIN') || bStyle.includes('BREAK') || bStyle.includes('UNORTHODOX') || bStyle.includes('SLOW');
 
-      if (isPacer) outsVsPacers += 1;
-      else if (isSpinner) outsVsSpinners += 1;
+      if (isSpinner) outsVsSpinners += 1;
+      else outsVsPacers += 1;
     });
 
     return res.status(200).json({

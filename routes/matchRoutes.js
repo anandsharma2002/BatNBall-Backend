@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { createMatch, getMatchById, getShareLink, joinMatchRoster, updateToss, updateUmpires, getAllMatches, dropPlayerFromRoster, movePlayerTeam, deleteMatch } = require('../controllers/matchController');
+const { createMatch, getTeamPreviousSquad, getMatchById, getShareLink, joinMatchRoster, updateToss, updateUmpires, getAllMatches, dropPlayerFromRoster, movePlayerTeam, deleteMatch } = require('../controllers/matchController');
 const { verifyToken } = require('../middleware/auth');
 
 router.post('/', verifyToken, createMatch);
+router.get('/team-previous-squad', verifyToken, getTeamPreviousSquad);
 router.get('/', verifyToken, getAllMatches);
 router.get('/:matchId', verifyToken, getMatchById);
 router.get('/:matchId/share-link', verifyToken, getShareLink);

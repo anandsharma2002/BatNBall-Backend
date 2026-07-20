@@ -2,6 +2,7 @@ const Match = require('../models/Match');
 const BallByBall = require('../models/BallByBall');
 const Partnership = require('../models/Partnership');
 const { updateCareerStatsForMatch } = require('../services/statsService');
+const { invalidateLeaderboardCache } = require('./leaderboardController');
 
 const getPopulatedMatch = async (matchId) => {
   return await Match.findById(matchId)
@@ -102,6 +103,11 @@ const emitScoreUpdate = async (req, matchId, populatedMatch) => {
 
     io.to(matchId).emit('match:score_update', payload);
     io.to(`match_room_${matchId}`).emit('match:score_update', payload);
+
+    if (populatedMatch.match_status === 'COMPLETED') {
+      invalidateLeaderboardCache();
+      io.emit('global_leaderboard_updated');
+    }
   } catch (err) {
     console.error('Error emitting score update:', err);
   }

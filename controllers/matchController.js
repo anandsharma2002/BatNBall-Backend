@@ -12,7 +12,11 @@ const createMatch = async (req, res) => {
       ball_type,
       team_first_id,
       team_second_id,
-      match_rules
+      match_rules,
+      copy_team_a_previous_squad,
+      team_a_previous_match_id,
+      copy_team_b_previous_squad,
+      team_b_previous_match_id
     } = req.body;
 
     const userId = req.user.userId;
@@ -33,6 +37,58 @@ const createMatch = async (req, res) => {
       umpires.push(req.user.associatedPlayerId);
     }
 
+    // Copy squads independently per team if requested
+    let playing_xi_team_first = [];
+    let substitutes_team_first = [];
+    let playing_xi_team_second = [];
+    let substitutes_team_second = [];
+
+    if (copy_team_a_previous_squad) {
+      let matchA = team_a_previous_match_id ? await Match.findById(team_a_previous_match_id) : null;
+      if (!matchA) {
+        matchA = await Match.findOne({
+          $or: [{ team_first_id: team_first_id }, { team_second_id: team_first_id }]
+        }).sort({ match_date_time: -1 });
+      }
+      if (matchA) {
+        const isFirst = (matchA.team_first_id?._id || matchA.team_first_id)?.toString() === team_first_id.toString();
+        playing_xi_team_first = isFirst ? (matchA.playing_xi_team_first || []) : (matchA.playing_xi_team_second || []);
+        substitutes_team_first = isFirst ? (matchA.substitutes_team_first || []) : (matchA.substitutes_team_second || []);
+
+        if (matchA.umpires && Array.isArray(matchA.umpires)) {
+          matchA.umpires.forEach(uId => {
+            const strId = (uId._id || uId).toString();
+            if (!umpires.some(existing => (existing._id || existing).toString() === strId)) {
+              umpires.push(uId);
+            }
+          });
+        }
+      }
+    }
+
+    if (copy_team_b_previous_squad) {
+      let matchB = team_b_previous_match_id ? await Match.findById(team_b_previous_match_id) : null;
+      if (!matchB) {
+        matchB = await Match.findOne({
+          $or: [{ team_first_id: team_second_id }, { team_second_id: team_second_id }]
+        }).sort({ match_date_time: -1 });
+      }
+      if (matchB) {
+        const isFirst = (matchB.team_first_id?._id || matchB.team_first_id)?.toString() === team_second_id.toString();
+        playing_xi_team_second = isFirst ? (matchB.playing_xi_team_first || []) : (matchB.playing_xi_team_second || []);
+        substitutes_team_second = isFirst ? (matchB.substitutes_team_first || []) : (matchB.substitutes_team_second || []);
+
+        if (matchB.umpires && Array.isArray(matchB.umpires)) {
+          matchB.umpires.forEach(uId => {
+            const strId = (uId._id || uId).toString();
+            if (!umpires.some(existing => (existing._id || existing).toString() === strId)) {
+              umpires.push(uId);
+            }
+          });
+        }
+      }
+    }
+
     const newMatch = new Match({
       venue,
       match_date_time: new Date(match_date_time),
@@ -43,6 +99,10 @@ const createMatch = async (req, res) => {
       team_second_id,
       created_by: userId,
       umpires,
+      playing_xi_team_first,
+      substitutes_team_first,
+      playing_xi_team_second,
+      substitutes_team_second,
       match_status: 'UPCOMING',
       match_rules: match_rules || {
         wide_ball_run_added: true,
@@ -62,6 +122,47 @@ const createMatch = async (req, res) => {
     });
   } catch (error) {
     console.error('Create match error:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+};
+
+const getTeamPreviousSquad = async (req, res) => {
+  try {
+    const { teamId } = req.query;
+    if (!teamId) {
+      return res.status(400).json({ error: 'teamId is required' });
+    }
+
+    const matches = await Match.find({
+      $or: [
+        { team_first_id: teamId },
+        { team_second_id: teamId }
+      ]
+    })
+      .sort({ match_date_time: -1 })
+      .limit(20);
+
+    for (const m of matches) {
+      const firstId = (m.team_first_id?._id || m.team_first_id)?.toString();
+      const targetId = teamId.toString();
+
+      const isTeamFirst = firstId === targetId;
+      const playingXi = isTeamFirst ? (m.playing_xi_team_first || []) : (m.playing_xi_team_second || []);
+      const substitutes = isTeamFirst ? (m.substitutes_team_first || []) : (m.substitutes_team_second || []);
+
+      const count = playingXi.length + substitutes.length;
+      if (count > 0) {
+        return res.status(200).json({
+          hasPreviousMatch: true,
+          matchId: m._id,
+          squadCount: count
+        });
+      }
+    }
+
+    return res.status(200).json({ hasPreviousMatch: false });
+  } catch (error) {
+    console.error('Get team previous squad error:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 };
@@ -504,6 +605,7 @@ const deleteMatch = async (req, res) => {
 
 module.exports = {
   createMatch,
+  getTeamPreviousSquad,
   getMatchById,
   getShareLink,
   joinMatchRoster,

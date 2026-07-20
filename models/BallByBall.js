@@ -117,7 +117,9 @@ const BallByBallSchema = new mongoose.Schema({
   }
 }, { timestamps: true, collection: 'ball_by_ball' });
 
-// Compound index to speed up scorecard queries per innings
+// Compound indexes to speed up scorecard & leaderboard aggregation queries
 BallByBallSchema.index({ match_id: 1, innings_number: 1 });
+BallByBallSchema.index({ match_id: 1, innings_number: 1, striker_id: 1 });
+BallByBallSchema.index({ match_id: 1, innings_number: 1, 'dismissal.is_wicket': 1, 'dismissal.dismissed_player_id': 1 });
 
 module.exports = mongoose.model('BallByBall', BallByBallSchema);
